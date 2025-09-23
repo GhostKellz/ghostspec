@@ -1,10 +1,17 @@
 # ghostspec
 
-<img src="assets/icons/ztest.png" alt="GhostSpec Logo" width="200"/>
+<div align="center">
+  <img src="assets/icons/ztest.png" alt="GhostSpec Logo" width="200"/>
+</div>
 
-**Built with Zig**  
-<img src="https://ziglang.org/zig-logo-dark.svg" alt="Zig Logo" width="40" height="40"/>  
-**Zig Version: 0.16.0-dev**
+<div align="center">
+
+![Built with Zig](https://img.shields.io/badge/Built%20with-Zig-F7A41D?style=for-the-badge&logo=zig&logoColor=white)
+![Zig Version](https://img.shields.io/badge/Zig-0.16.0-F7A41D?style=for-the-badge&logo=zig&logoColor=white)
+![Testing](https://img.shields.io/badge/Testing-Property%20Based-4CAF50?style=for-the-badge&logo=checkmark&logoColor=white)
+![Benchmarking](https://img.shields.io/badge/Benchmarking-Performance-FF9800?style=for-the-badge&logo=trending-up&logoColor=white)
+
+</div>
 
 GhostSpec is a comprehensive testing framework for Zig that provides property-based testing, fuzzing, benchmarking, and mocking capabilities.
 
