@@ -6,8 +6,11 @@
   <br/>
   <br/>
 
-  ![Built with Zig](https://img.shields.io/badge/Built%20with-Zig-000000?logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNTAgMTUwIj48cGF0aCBmaWxsPSIjZjdkNDFkIiBkPSJNMTUgMzBsMjAgMzBIMjV2MzBoNDB2MzBIMjV2MzBoNDB2LTMwaDEwbDIwIDMwdi0zMEg4NXYtMzBoNDB2LTMwSDg1VjMwaDQwVjBIMTV2MzB6Ii8+PC9zdmc+)
+  **Built with Zig**
+  <img src="https://ziglang.org/zig-logo-dark.svg" alt="Zig Logo" width="40" height="40"/>
   ![Zig Version](https://img.shields.io/badge/Zig-0.16.0--dev-F7A41D)
+  ![Property Testing](https://img.shields.io/badge/Property%20Testing-✓-4CAF50)
+  ![Fuzzing Support](https://img.shields.io/badge/Fuzzing-✓-FF6B6B)
 </div>
 
 <br/>
