@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Zig
+        uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.16.0-dev
+
+      - name: Verify formatting
+        run: zig fmt --check src examples
+
+      - name: Run tests
+        run: zig build test
+
+      - name: Generate coverage
+        run: |
+          chmod +x tools/run-coverage.sh
+          tools/run-coverage.sh
+        env:
+          ZIG_SYSTEM_LINKER_HACK: 1
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/

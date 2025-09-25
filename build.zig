@@ -142,6 +142,11 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_mod_tests.step);
     test_step.dependOn(&run_exe_tests.step);
 
+    // Alias for Zion integration: enables `zig build ghostspec-test`
+    const ghostspec_test_step = b.step("ghostspec-test", "Run GhostSpec test suites");
+    ghostspec_test_step.dependOn(&run_mod_tests.step);
+    ghostspec_test_step.dependOn(&run_exe_tests.step);
+
     // Just like flags, top level steps are also listed in the `--help` menu.
     //
     // The Zig build system is entirely implemented in userland, which means

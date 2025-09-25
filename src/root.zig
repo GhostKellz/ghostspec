@@ -33,6 +33,7 @@ pub const mocking = @import("mock.zig");
 pub const test_runner = @import("runner.zig");
 pub const data_generator = @import("generator.zig");
 pub const test_reporter = @import("reporter.zig");
+pub const zion = @import("integration/zion.zig");
 
 // Core API functions matching TODO.md requirements
 

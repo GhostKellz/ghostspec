@@ -9,10 +9,14 @@ Welcome to the official documentation for **GhostSpec**, the advanced testing fr
 - **[Benchmarking](./benchmarking.md)** - Performance testing and regression detection
 - **[Fuzzing](./fuzzing.md)** - Coverage-guided fuzz testing
 - **[Mocking](./mocking.md)** - Dynamic mock objects and behavior verification
-- **[Test Runner](./test-runner.md)** - Parallel test execution
+- **[Architecture Overview](./architecture.md)** - Internal module map and data flow
 - **[API Reference](./api-reference.md)** - Complete API documentation
 - **[Examples](./examples/)** - Real-world usage examples
-- **[Migration Guide](./migration.md)** - Migrating from other testing frameworks
+- **[Migration Guide](./migration-guide.md)** - Migrating from other testing frameworks
+- **[Best Practices](./best-practices.md)** - Patterns for maintainable suites
+- **[Troubleshooting](./troubleshooting.md)** - Fix common issues quickly
+- **[Contributor Guide](../CONTRIBUTING.md)** - Onboarding for new contributors
+- **[Issue Triage Process](./process/triage.md)** - Keep the tracker healthy
 
 ## 🚀 Quick Links
 
