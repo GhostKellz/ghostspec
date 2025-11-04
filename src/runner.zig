@@ -102,16 +102,16 @@ pub const TestSuite = struct {
         return TestSuite{
             .allocator = allocator,
             .name = name,
-            .tests = std.ArrayList(TestFunction).init(allocator),
+            .tests = .empty,
         };
     }
 
     pub fn deinit(self: *TestSuite) void {
-        self.tests.deinit();
+        self.tests.deinit(self.allocator);
     }
 
     pub fn addTest(self: *TestSuite, test_fn: TestFunction) !void {
-        try self.tests.append(test_fn);
+        try self.tests.append(self.allocator, test_fn);
     }
 
     pub fn setSetup(self: *TestSuite, setup_fn: *const fn () anyerror!void) void {
@@ -136,10 +136,62 @@ const TestWorker = struct {
         suite_name: []const u8,
         setup_fn: ?*const fn () anyerror!void,
         teardown_fn: ?*const fn () anyerror!void,
+        is_sentinel: bool = false,
     };
 
-    const WorkQueue = std.fifo.LinearFifo(WorkItem, .Dynamic);
-    const ResultsQueue = std.fifo.LinearFifo(TestExecutionResult, .Dynamic);
+    const WorkQueue = struct {
+        items: std.ArrayList(WorkItem),
+        mutex: std.Thread.Mutex = .{},
+
+        fn init(_: std.mem.Allocator) WorkQueue {
+            return .{ .items = std.ArrayList(WorkItem).empty };
+        }
+
+        fn deinit(self: *WorkQueue, allocator: std.mem.Allocator) void {
+            self.items.deinit(allocator);
+        }
+
+        fn push(self: *WorkQueue, allocator: std.mem.Allocator, item: WorkItem) !void {
+            self.mutex.lock();
+            defer self.mutex.unlock();
+            try self.items.append(allocator, item);
+        }
+
+        fn pop(self: *WorkQueue, allocator: std.mem.Allocator) ?WorkItem {
+            _ = allocator;
+            self.mutex.lock();
+            defer self.mutex.unlock();
+            if (self.items.items.len == 0) return null;
+            return self.items.orderedRemove(0);
+        }
+    };
+
+    const ResultsQueue = struct {
+        items: std.ArrayList(TestExecutionResult),
+        mutex: std.Thread.Mutex = .{},
+
+        fn init(_: std.mem.Allocator) ResultsQueue {
+            return .{ .items = std.ArrayList(TestExecutionResult).empty };
+        }
+
+        fn deinit(self: *ResultsQueue, allocator: std.mem.Allocator) void {
+            self.items.deinit(allocator);
+        }
+
+        fn push(self: *ResultsQueue, allocator: std.mem.Allocator, item: TestExecutionResult) !void {
+            self.mutex.lock();
+            defer self.mutex.unlock();
+            try self.items.append(allocator, item);
+        }
+
+        fn pop(self: *ResultsQueue, allocator: std.mem.Allocator) ?TestExecutionResult {
+            _ = allocator;
+            self.mutex.lock();
+            defer self.mutex.unlock();
+            if (self.items.items.len == 0) return null;
+            return self.items.orderedRemove(0);
+        }
+    };
 
     pub fn spawn(
         allocator: std.mem.Allocator,
@@ -169,10 +221,16 @@ const TestWorker = struct {
         config: RunnerConfig,
     ) void {
         while (true) {
-            const work_item = work_queue.readItem() orelse break;
+            const work_item = work_queue.pop(allocator) orelse {
+                std.posix.nanosleep(0, 1 * std.time.ns_per_ms);
+                continue;
+            };
+
+            // Check for sentinel value to exit
+            if (work_item.is_sentinel) break;
 
             const result = executeTest(allocator, work_item, config);
-            results_queue.writeItem(result) catch break;
+            results_queue.push(allocator, result) catch break;
         }
     }
 
@@ -185,15 +243,18 @@ const TestWorker = struct {
             };
         }
 
-        const start_time = std.time.milliTimestamp();
+        const ts_start = std.posix.clock_gettime(std.posix.CLOCK.REALTIME) catch unreachable;
+        const start_time: i64 = @intCast(@divTrunc((@as(i128, ts_start.sec) * std.time.ns_per_s + ts_start.nsec), std.time.ns_per_ms));
 
         // Run setup if provided
         if (work_item.setup_fn) |setup| {
             setup() catch |err| {
+                const ts_now = std.posix.clock_gettime(std.posix.CLOCK.REALTIME) catch unreachable;
+                const now_time: i64 = @intCast(@divTrunc((@as(i128, ts_now.sec) * std.time.ns_per_s + ts_now.nsec), std.time.ns_per_ms));
                 return TestExecutionResult{
                     .name = work_item.test_fn.name,
                     .status = .err,
-                    .duration_ms = @intCast(std.time.milliTimestamp() - start_time),
+                    .duration_ms = @intCast(now_time - start_time),
                     .error_message = std.fmt.allocPrint(allocator, "Setup failed: {any}", .{err}) catch null,
                 };
             };
@@ -214,7 +275,8 @@ const TestWorker = struct {
         else
             executeTestDirect(allocator, work_item.test_fn, config);
 
-        const end_time = std.time.milliTimestamp();
+        const ts_end = std.posix.clock_gettime(std.posix.CLOCK.REALTIME) catch unreachable;
+        const end_time: i64 = @intCast(@divTrunc((@as(i128, ts_end.sec) * std.time.ns_per_s + ts_end.nsec), std.time.ns_per_ms));
         const duration = @as(u64, @intCast(end_time - start_time));
 
         return TestExecutionResult{
@@ -274,7 +336,7 @@ pub const Runner = struct {
         return Runner{
             .allocator = allocator,
             .config = config,
-            .suites = std.ArrayList(TestSuite).init(allocator),
+            .suites = .empty,
         };
     }
 
@@ -282,24 +344,25 @@ pub const Runner = struct {
         for (self.suites.items) |*suite| {
             suite.deinit();
         }
-        self.suites.deinit();
+        self.suites.deinit(self.allocator);
     }
 
     pub fn addSuite(self: *Runner, suite: TestSuite) !void {
-        try self.suites.append(suite);
+        try self.suites.append(self.allocator, suite);
     }
 
     /// Run all tests and return results
     pub fn runAll(self: *Runner) !reporter.TestReport {
-        var all_results = std.ArrayList(TestExecutionResult).init(self.allocator);
+        var all_results: std.ArrayList(TestExecutionResult) = .empty;
         defer {
             for (all_results.items) |*result| {
                 result.deinit(self.allocator);
             }
-            all_results.deinit();
+            all_results.deinit(self.allocator);
         }
 
-        const start_time = std.time.milliTimestamp();
+        const ts_start = std.posix.clock_gettime(std.posix.CLOCK.REALTIME) catch unreachable;
+        const start_time: i64 = @intCast(@divTrunc((@as(i128, ts_start.sec) * std.time.ns_per_s + ts_start.nsec), std.time.ns_per_ms));
 
         if (self.config.parallel_execution and self.config.max_concurrency > 1) {
             try self.runParallel(&all_results);
@@ -307,7 +370,8 @@ pub const Runner = struct {
             try self.runSequential(&all_results);
         }
 
-        const end_time = std.time.milliTimestamp();
+        const ts_end = std.posix.clock_gettime(std.posix.CLOCK.REALTIME) catch unreachable;
+        const end_time: i64 = @intCast(@divTrunc((@as(i128, ts_end.sec) * std.time.ns_per_s + ts_end.nsec), std.time.ns_per_ms));
         const total_duration = @as(u64, @intCast(end_time - start_time));
 
         // Create test report
@@ -336,7 +400,7 @@ pub const Runner = struct {
                 };
 
                 const result = TestWorker.executeTest(self.allocator, work_item, self.config);
-                try results.append(result);
+                try results.append(self.allocator, result);
 
                 // Fail fast if enabled
                 if (self.config.fail_fast and result.status.isFailure()) {
@@ -348,10 +412,10 @@ pub const Runner = struct {
 
     fn runParallel(self: *Runner, results: *std.ArrayList(TestExecutionResult)) !void {
         var work_queue = TestWorker.WorkQueue.init(self.allocator);
-        defer work_queue.deinit();
+        defer work_queue.deinit(self.allocator);
 
         var results_queue = TestWorker.ResultsQueue.init(self.allocator);
-        defer results_queue.deinit();
+        defer results_queue.deinit(self.allocator);
 
         // Populate work queue
         var total_tests: u32 = 0;
@@ -364,33 +428,41 @@ pub const Runner = struct {
                     .teardown_fn = suite.teardown_fn,
                 };
 
-                try work_queue.writeItem(work_item);
+                try work_queue.push(self.allocator, work_item);
                 total_tests += 1;
             }
         }
 
         // Spawn worker threads
-        var workers = std.ArrayList(TestWorker).init(self.allocator);
+        var workers: std.ArrayList(TestWorker) = .empty;
         defer {
             for (workers.items) |worker| {
                 worker.join();
             }
-            workers.deinit();
+            workers.deinit(self.allocator);
         }
 
         const num_workers = @min(self.config.max_concurrency, total_tests);
         for (0..num_workers) |_| {
             const worker = try TestWorker.spawn(self.allocator, &work_queue, &results_queue, self.config);
-            try workers.append(worker);
+            try workers.append(self.allocator, worker);
         }
 
-        // Signal workers to stop by closing the work queue
-        work_queue.close();
+        // Signal workers to stop by putting sentinel items
+        for (0..num_workers) |_| {
+            try work_queue.push(self.allocator, .{
+                .test_fn = undefined,
+                .suite_name = "",
+                .setup_fn = null,
+                .teardown_fn = null,
+                .is_sentinel = true,
+            });
+        }
 
         // Collect results
         for (0..total_tests) |_| {
-            if (results_queue.readItem()) |result| {
-                try results.append(result);
+            if (results_queue.pop(self.allocator)) |result| {
+                try results.append(self.allocator, result);
 
                 // Fail fast if enabled
                 if (self.config.fail_fast and result.status.isFailure()) {

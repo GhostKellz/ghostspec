@@ -111,14 +111,14 @@ fn hashArgs(args: anytype) u64 {
 fn hashValue(hasher: *std.hash.Fnv1a_64, value: anytype) void {
     const T = @TypeOf(value);
     switch (@typeInfo(T)) {
-        .Int, .Float => {
+        .int, .float => {
             const bytes = std.mem.asBytes(&value);
             hasher.update(bytes);
         },
         .bool => {
             hasher.update(&[_]u8{if (value) 1 else 0});
         },
-        .Pointer => |ptr_info| {
+        .pointer => |ptr_info| {
             if (ptr_info.size == .Slice and ptr_info.child == u8) {
                 hasher.update(value);
             } else {
@@ -128,12 +128,12 @@ fn hashValue(hasher: *std.hash.Fnv1a_64, value: anytype) void {
                 hasher.update(bytes);
             }
         },
-        .Struct => {
-            inline for (@typeInfo(T).Struct.fields) |field| {
+        .@"struct" => {
+            inline for (@typeInfo(T).@"struct".fields) |field| {
                 hashValue(hasher, @field(value, field.name));
             }
         },
-        .Array => {
+        .array => {
             for (value) |item| {
                 hashValue(hasher, item);
             }

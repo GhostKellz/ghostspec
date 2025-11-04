@@ -5,6 +5,10 @@
 
 const std = @import("std");
 const colors = @import("colors.zig");
+const runner = @import("runner.zig");
+
+pub const TestExecutionResult = runner.TestExecutionResult;
+pub const TestStatus = runner.TestStatus;
 
 /// Overall test report containing all results and statistics
 pub const TestReport = struct {
@@ -28,7 +32,7 @@ pub const TestReport = struct {
     pub fn init(allocator: std.mem.Allocator) TestReport {
         return TestReport{
             .allocator = allocator,
-            .results = std.ArrayList(TestExecutionResult).init(allocator),
+            .results = .empty,
         };
     }
 
@@ -36,11 +40,11 @@ pub const TestReport = struct {
         for (self.results.items) |*result| {
             result.deinit(self.allocator);
         }
-        self.results.deinit();
+        self.results.deinit(self.allocator);
     }
 
     pub fn addResult(self: *TestReport, result: TestExecutionResult) !void {
-        try self.results.append(result);
+        try self.results.append(self.allocator, result);
     }
 
     /// Calculate final statistics after all results are added
@@ -104,10 +108,8 @@ pub const TestReport = struct {
 
     /// Print summary to stdout
     pub fn printSummary(self: TestReport) void {
-        self.printSummaryColored(std.io.getStdErr().writer()) catch {
-            // Fallback to simple print if colored fails
-            self.printSummarySimple();
-        };
+        // Use std.debug.print which writes to stderr
+        self.printSummarySimple();
     }
 
     /// Print summary with colors
@@ -409,35 +411,6 @@ pub const TestReport = struct {
     }
 };
 
-/// Individual test execution result (re-exported from runner)
-pub const TestExecutionResult = struct {
-    name: []const u8,
-    status: TestStatus,
-    duration_ms: u64,
-    error_message: ?[]const u8 = null,
-    stdout: ?[]const u8 = null,
-    stderr: ?[]const u8 = null,
-    memory_usage: ?u64 = null,
-
-    pub fn deinit(self: *TestExecutionResult, allocator: std.mem.Allocator) void {
-        if (self.error_message) |msg| allocator.free(msg);
-        if (self.stdout) |out| allocator.free(out);
-        if (self.stderr) |err| allocator.free(err);
-    }
-};
-
-/// Test status (re-exported from runner)
-pub const TestStatus = enum {
-    passed,
-    failed,
-    skipped,
-    timeout,
-    err,
-
-    pub fn isFailure(self: TestStatus) bool {
-        return self == .failed or self == .timeout or self == .err;
-    }
-};
 
 test "reporter: basic functionality" {
     var report = TestReport.init(std.testing.allocator);

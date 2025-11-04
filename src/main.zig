@@ -217,7 +217,7 @@ pub fn main() !void {
     const add_result = try mock_calc.executeCall("add", i32, .{ 10, 20 });
     std.debug.print("✅ Mock add(10, 20) = {} (expected: 42)\n", .{add_result});
 
-    const divide_result = mock_calc.executeCall("divide", !f32, .{ 10, 0 });
+    const divide_result = mock_calc.executeCall("divide", f32, .{ 10, 0 });
     if (divide_result) |_| {
         std.debug.print("❌ Expected error but got result\n", .{});
     } else |err| {
@@ -251,7 +251,7 @@ pub fn main() !void {
 
         fn testSlowOperation() !void {
             // Simulate a slower test
-            std.time.sleep(10 * std.time.ns_per_ms);
+            std.posix.nanosleep(0, 10 * std.time.ns_per_ms);
             try std.testing.expect(true);
         }
     };
