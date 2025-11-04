@@ -44,7 +44,14 @@ pub const PropertyTest = struct {
     rng: std.Random.DefaultPrng,
 
     pub fn init(allocator: std.mem.Allocator, config: Config) PropertyTest {
-        const seed: u64 = config.seed orelse @intCast(std.time.timestamp());
+        const seed: u64 = config.seed orelse blk: {
+            const instant = std.time.Instant.now() catch unreachable;
+            const seed_value: u64 = if (@import("builtin").os.tag == .windows or @import("builtin").os.tag == .uefi or @import("builtin").os.tag == .wasi)
+                instant.timestamp
+            else
+                @as(u64, @intCast(instant.timestamp.sec)) *% 1000000000 +% @as(u64, @intCast(instant.timestamp.nsec));
+            break :blk seed_value;
+        };
         return PropertyTest{
             .allocator = allocator,
             .config = config,

@@ -85,7 +85,12 @@ pub const Fuzzer = struct {
 
         const actual_iterations = @min(iterations, self.config.max_iterations);
 
-        var rng = std.Random.DefaultPrng.init(@as(u64, @intCast(std.time.timestamp())));
+        const seed_instant = std.time.Instant.now() catch unreachable;
+        const seed_value: u64 = if (@import("builtin").os.tag == .windows or @import("builtin").os.tag == .uefi or @import("builtin").os.tag == .wasi)
+            seed_instant.timestamp
+        else
+            @as(u64, @intCast(seed_instant.timestamp.sec)) *% 1000000000 +% @as(u64, @intCast(seed_instant.timestamp.nsec));
+        var rng = std.Random.DefaultPrng.init(seed_value);
 
         for (0..actual_iterations) |_| {
             // Generate random input

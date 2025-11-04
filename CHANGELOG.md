@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented here following [Keep a Changelog](https://keepachangelog.com/) guidelines.
 
+## [0.9.2] - 2025-11-03
+### Fixed
+- **Critical**: Updated deprecated `std.time` API calls to use Zig 0.16+ API
+  - Replaced `std.time.timestamp()` with `std.time.Instant.now()`
+  - Replaced `std.time.nanoTimestamp()` with `std.time.Instant` and `Timer` API
+  - Fixes compilation errors in `fuzzer.zig`, `benchmark.zig`, `mock.zig`, and `property.zig`
+- Fixed typo in `build.zig` comment (releative → relative)
+
+### Changed
+- Added LICENSE and README.md to `build.zig.zon` paths for proper package distribution
+- Bumped package version to `0.9.2`
+
 ## [0.9.0-beta.1] - 2025-09-24
 ### Added
 - Architecture guide, best practices, troubleshooting, and migration documentation.

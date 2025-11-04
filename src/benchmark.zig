@@ -302,7 +302,7 @@ pub const Benchmark = struct {
 
         var total_time: u64 = 0;
         var iterations: u32 = 0;
-        const start_time = std.time.nanoTimestamp();
+        const start_time = std.time.Instant.now() catch unreachable;
 
         // Main benchmark loop
         while (iterations < self.config.iterations) {
@@ -312,7 +312,8 @@ pub const Benchmark = struct {
             iterations += 1;
 
             // Check time limits
-            const elapsed = @as(u64, @intCast(std.time.nanoTimestamp() - start_time));
+            const current_time = std.time.Instant.now() catch unreachable;
+            const elapsed = current_time.since(start_time);
             if (elapsed >= self.config.max_time_ns) break;
             if (elapsed >= self.config.min_time_ns and iterations >= self.config.iterations / 2) break;
         }
@@ -335,7 +336,7 @@ pub const Benchmark = struct {
         const FnType = @TypeOf(bench_fn);
         const fn_info = @typeInfo(FnType).@"fn";
 
-        const start = std.time.nanoTimestamp();
+        const start = std.time.Instant.now() catch unreachable;
 
         // Check function signature and call appropriately
         if (fn_info.params.len == 0) {
@@ -347,8 +348,8 @@ pub const Benchmark = struct {
             @compileError("Benchmark function must take 0 or 1 parameters (allocator)");
         }
 
-        const end = std.time.nanoTimestamp();
-        return @intCast(end - start);
+        const end = std.time.Instant.now() catch unreachable;
+        return end.since(start);
     }
 };
 

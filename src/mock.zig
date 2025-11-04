@@ -190,10 +190,15 @@ pub fn Mock(comptime Interface: type) type {
         /// Record a function call
         pub fn recordCall(self: *Self, function_name: []const u8, args: anytype) void {
             const args_hash = hashArgs(args);
+            const instant = std.time.Instant.now() catch unreachable;
+            const timestamp: i64 = if (@import("builtin").os.tag == .windows or @import("builtin").os.tag == .uefi or @import("builtin").os.tag == .wasi)
+                @intCast(instant.timestamp)
+            else
+                instant.timestamp.sec;
             const call = Call{
                 .function_name = function_name,
                 .args_hash = args_hash,
-                .timestamp = std.time.timestamp(),
+                .timestamp = timestamp,
             };
             self.calls.append(self.allocator, call) catch unreachable;
         }
