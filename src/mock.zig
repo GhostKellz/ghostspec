@@ -115,7 +115,7 @@ fn hashValue(hasher: *std.hash.Fnv1a_64, value: anytype) void {
             const bytes = std.mem.asBytes(&value);
             hasher.update(bytes);
         },
-        .Bool => {
+        .bool => {
             hasher.update(&[_]u8{if (value) 1 else 0});
         },
         .Pointer => |ptr_info| {

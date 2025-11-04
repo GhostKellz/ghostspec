@@ -53,19 +53,19 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    std.debug.print("🚀 GhostSpec Demo - Advanced Testing Framework for Zig\n");
-    std.debug.print("=====================================================\n\n");
+    std.debug.print("🚀 GhostSpec Demo - Advanced Testing Framework for Zig\n", .{});
+    std.debug.print("=====================================================\n\n", .{});
 
     // Demo 1: Property-based testing
-    std.debug.print("📊 Property-Based Testing Demo\n");
-    std.debug.print("────────────────────────────────\n");
+    std.debug.print("📊 Property-Based Testing Demo\n", .{});
+    std.debug.print("────────────────────────────────\n", .{});
 
     const PropertyTests = struct {
-        fn testAdditionCommutative(values: struct { a: i32, b: i32 }) !void {
+        fn testAdditionCommutative(values: anytype) !void {
             try std.testing.expect(add(values.a, values.b) == add(values.b, values.a));
         }
 
-        fn testAdditionAssociative(values: struct { a: i32, b: i32, c: i32 }) !void {
+        fn testAdditionAssociative(values: anytype) !void {
             const left = add(add(values.a, values.b), values.c);
             const right = add(values.a, add(values.b, values.c));
             try std.testing.expect(left == right);
@@ -75,7 +75,7 @@ pub fn main() !void {
     // Run property tests
     var property_test = ghostspec.property_testing.PropertyTest.init(allocator, ghostspec.property_testing.Config{ .num_tests = 50 });
 
-    std.debug.print("Testing addition commutativity...\n");
+    std.debug.print("Testing addition commutativity...\n", .{});
     const comm_result = try property_test.runProperty(struct { a: i32, b: i32 }, PropertyTests.testAdditionCommutative);
     defer {
         var mut_result = comm_result;
@@ -83,7 +83,7 @@ pub fn main() !void {
     }
     std.debug.print("✅ Passed {} tests\n", .{comm_result.num_tests_run});
 
-    std.debug.print("Testing addition associativity...\n");
+    std.debug.print("Testing addition associativity...\n", .{});
     const assoc_result = try property_test.runProperty(struct { a: i32, b: i32, c: i32 }, PropertyTests.testAdditionAssociative);
     defer {
         var mut_result = assoc_result;
@@ -92,8 +92,8 @@ pub fn main() !void {
     std.debug.print("✅ Passed {} tests\n\n", .{assoc_result.num_tests_run});
 
     // Demo 2: Fuzzing
-    std.debug.print("🔍 Fuzzing Demo\n");
-    std.debug.print("───────────────\n");
+    std.debug.print("🔍 Fuzzing Demo\n", .{});
+    std.debug.print("───────────────\n", .{});
 
     const FuzzTargets = struct {
         fn parseInteger(input: []const u8) !void {
@@ -125,7 +125,7 @@ pub fn main() !void {
     var fuzzer = try ghostspec.fuzzing.Fuzzer.init(allocator, fuzz_config);
     defer fuzzer.deinit();
 
-    std.debug.print("Fuzzing integer parser...\n");
+    std.debug.print("Fuzzing integer parser...\n", .{});
     var parse_result = try fuzzer.run(FuzzTargets.parseInteger, 100);
     defer parse_result.deinit(allocator);
     std.debug.print("✅ Ran {} iterations, found {} crashes\n", .{ parse_result.total_iterations, parse_result.crashes_found });
@@ -133,14 +133,14 @@ pub fn main() !void {
     // Add a problematic input to test crash detection
     try fuzzer.addCorpus("crash_me");
 
-    std.debug.print("Fuzzing string processor (with known crash)...\n");
+    std.debug.print("Fuzzing string processor (with known crash)...\n", .{});
     var string_result = try fuzzer.run(FuzzTargets.processString, 50);
     defer string_result.deinit(allocator);
     std.debug.print("🔍 Ran {} iterations, found {} crashes\n\n", .{ string_result.total_iterations, string_result.crashes_found });
 
     // Demo 3: Benchmarking
-    std.debug.print("⚡ Benchmarking Demo\n");
-    std.debug.print("───────────────────\n");
+    std.debug.print("⚡ Benchmarking Demo\n", .{});
+    std.debug.print("───────────────────\n", .{});
 
     const BenchFunctions = struct {
         fn benchFibonacci() void {
@@ -149,11 +149,13 @@ pub fn main() !void {
         }
 
         fn benchStringConcatenation(bench_allocator: std.mem.Allocator) void {
-            var str = std.ArrayList(u8).init(bench_allocator);
-            defer str.deinit();
+            var str: std.ArrayList(u8) = .empty;
+            defer str.deinit(bench_allocator);
 
+            var buf: [20]u8 = undefined;
             for (0..100) |i| {
-                str.writer().print("item{}", .{i}) catch return;
+                const formatted = std.fmt.bufPrint(&buf, "item{}", .{i}) catch return;
+                str.appendSlice(bench_allocator, formatted) catch return;
             }
 
             std.mem.doNotOptimizeAway(str.items);
@@ -182,42 +184,42 @@ pub fn main() !void {
 
     var benchmark = ghostspec.benchmarking.Benchmark.init(allocator, bench_config);
 
-    std.debug.print("Benchmarking Fibonacci(20)...\n");
+    std.debug.print("Benchmarking Fibonacci(20)...\n", .{});
     const fib_result = try benchmark.runBenchmark("fibonacci", BenchFunctions.benchFibonacci);
     std.debug.print("📈 Avg: {d:.2}ns/iter, Throughput: {d:.2} iter/sec\n", .{ fib_result.averageTimePerIteration(), fib_result.throughputPerSecond() });
 
-    std.debug.print("Benchmarking string concatenation...\n");
+    std.debug.print("Benchmarking string concatenation...\n", .{});
     const str_result = try benchmark.runBenchmark("string_concat", BenchFunctions.benchStringConcatenation);
     std.debug.print("📈 Avg: {d:.2}ns/iter", .{str_result.averageTimePerIteration()});
     if (str_result.memory_info) |mem| {
         std.debug.print(", Memory: {} bytes peak\n", .{mem.peak_memory});
     } else {
-        std.debug.print("\n");
+        std.debug.print("\n", .{});
     }
 
-    std.debug.print("Benchmarking array sum...\n");
+    std.debug.print("Benchmarking array sum...\n", .{});
     const sum_result = try benchmark.runBenchmark("array_sum", BenchFunctions.benchArraySum);
     std.debug.print("📈 Avg: {d:.2}ns/iter, Throughput: {d:.2} iter/sec\n\n", .{ sum_result.averageTimePerIteration(), sum_result.throughputPerSecond() });
 
     // Demo 4: Mocking
-    std.debug.print("🎭 Mocking Demo\n");
-    std.debug.print("──────────────\n");
+    std.debug.print("🎭 Mocking Demo\n", .{});
+    std.debug.print("──────────────\n", .{});
 
     var mock_calc = ghostspec.mocking.Mock(Calculator).init();
     defer mock_calc.deinit();
 
     // Set up mock behavior
     _ = mock_calc.when("add").returnValue(i32, 42);
-    _ = mock_calc.when("divide").err(error.DivisionByZero);
+    mock_calc.when("divide").* = ghostspec.mocking.MockBehavior.err(error.DivisionByZero);
 
     // Test mock behavior
-    std.debug.print("Testing mocked calculator...\n");
+    std.debug.print("Testing mocked calculator...\n", .{});
     const add_result = try mock_calc.executeCall("add", i32, .{ 10, 20 });
     std.debug.print("✅ Mock add(10, 20) = {} (expected: 42)\n", .{add_result});
 
     const divide_result = mock_calc.executeCall("divide", !f32, .{ 10, 0 });
     if (divide_result) |_| {
-        std.debug.print("❌ Expected error but got result\n");
+        std.debug.print("❌ Expected error but got result\n", .{});
     } else |err| {
         std.debug.print("✅ Mock divide(10, 0) threw error: {}\n", .{err});
     }
@@ -225,11 +227,11 @@ pub fn main() !void {
     // Verify calls
     try mock_calc.verifyCalled("add", .{ 10, 20 });
     try mock_calc.verifyCalled("divide", .{ 10, 0 });
-    std.debug.print("✅ All mock verifications passed\n\n");
+    std.debug.print("✅ All mock verifications passed\n\n", .{});
 
     // Demo 5: Test Runner
-    std.debug.print("🏃 Test Runner Demo\n");
-    std.debug.print("──────────────────\n");
+    std.debug.print("🏃 Test Runner Demo\n", .{});
+    std.debug.print("──────────────────\n", .{});
 
     const TestFunctions = struct {
         fn testAlwaysPass() !void {
@@ -277,8 +279,8 @@ pub fn main() !void {
 
     test_report.printSummary();
 
-    std.debug.print("🎉 GhostSpec Demo Complete!\n");
-    std.debug.print("All major features demonstrated successfully.\n");
+    std.debug.print("🎉 GhostSpec Demo Complete!\n", .{});
+    std.debug.print("All major features demonstrated successfully.\n", .{});
 }
 
 // Some basic tests to verify the framework is working

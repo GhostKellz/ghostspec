@@ -63,7 +63,7 @@ pub const PropertyTest = struct {
     pub fn runProperty(
         self: *PropertyTest,
         comptime T: type,
-        comptime property_fn: fn (T) anyerror!void,
+        comptime property_fn: anytype,
     ) !PropertyResult {
         var result = PropertyResult{
             .passed = true,
@@ -104,7 +104,7 @@ pub const PropertyTest = struct {
         self: *PropertyTest,
         comptime T: type,
         original_value: T,
-        comptime property_fn: fn (T) anyerror!void,
+        comptime property_fn: anytype,
     ) !?T {
         // For now, implement basic shrinking for integers
         return switch (@typeInfo(T)) {

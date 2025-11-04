@@ -200,9 +200,21 @@ pub const TrackingAllocator = struct {
             .vtable = &.{
                 .alloc = alloc,
                 .resize = resize,
+                .remap = remap,
                 .free = free,
             },
         };
+    }
+
+    fn remap(ctx: *anyopaque, memory: []u8, log2_align: std.mem.Alignment, new_len: usize, ra: usize) ?[*]u8 {
+        _ = ctx;
+        _ = memory;
+        _ = log2_align;
+        _ = new_len;
+        _ = ra;
+        // For tracking purposes, we don't support remap - return null to indicate
+        // the allocator should use alloc+free instead
+        return null;
     }
 
     pub fn getMemoryInfo(self: *TrackingAllocator) MemoryInfo {
@@ -222,7 +234,7 @@ pub const TrackingAllocator = struct {
         self.allocations = 0;
     }
 
-    fn alloc(ctx: *anyopaque, len: usize, log2_ptr_align: u8, ra: usize) ?[*]u8 {
+    fn alloc(ctx: *anyopaque, len: usize, log2_ptr_align: std.mem.Alignment, ra: usize) ?[*]u8 {
         const self: *TrackingAllocator = @ptrCast(@alignCast(ctx));
 
         if (self.child_allocator.rawAlloc(len, log2_ptr_align, ra)) |result| {
@@ -239,7 +251,7 @@ pub const TrackingAllocator = struct {
         return null;
     }
 
-    fn resize(ctx: *anyopaque, buf: []u8, log2_buf_align: u8, new_len: usize, ra: usize) bool {
+    fn resize(ctx: *anyopaque, buf: []u8, log2_buf_align: std.mem.Alignment, new_len: usize, ra: usize) bool {
         const self: *TrackingAllocator = @ptrCast(@alignCast(ctx));
 
         if (self.child_allocator.rawResize(buf, log2_buf_align, new_len, ra)) {
@@ -262,7 +274,7 @@ pub const TrackingAllocator = struct {
         return false;
     }
 
-    fn free(ctx: *anyopaque, buf: []u8, log2_buf_align: u8, ra: usize) void {
+    fn free(ctx: *anyopaque, buf: []u8, log2_buf_align: std.mem.Alignment, ra: usize) void {
         const self: *TrackingAllocator = @ptrCast(@alignCast(ctx));
 
         self.child_allocator.rawFree(buf, log2_buf_align, ra);
