@@ -18,6 +18,8 @@ pub const fuzzing = @import("fuzzer.zig");
 pub const mocking = @import("mock.zig");
 pub const runner = @import("runner.zig");
 pub const reporter = @import("reporter.zig");
+pub const colors = @import("colors.zig");  // New in v0.9.2
+pub const filter = @import("filter.zig");  // New in v0.9.2
 
 // Convenience functions
 pub fn property(comptime T: type, comptime property_fn: anytype) !void;
@@ -369,3 +371,118 @@ errdefer instance.deinit();
 
 For more detailed examples and usage patterns, see the [examples directory](./examples/) and [getting started guide](./getting-started.md).</content>
 <parameter name="filePath">/data/projects/ghostspec/docs/api-reference.md
+## 🎨 Colors API (New in v0.9.2)
+
+### `ColorConfig`
+
+Control color output in terminal.
+
+```zig
+pub const ColorConfig = struct {
+    enabled: bool = true,
+    force: bool = false,
+    
+    pub fn auto() ColorConfig;    // Auto-detect terminal colors
+    pub fn always() ColorConfig;  // Always use colors
+    pub fn never() ColorConfig;   // Never use colors
+};
+```
+
+### `Style`
+
+Terminal styling and colored output.
+
+```zig
+pub const Style = struct {
+    pub fn init(config: ColorConfig) Style;
+    pub fn success(self: Style, writer: anytype, comptime fmt: []const u8, args: anytype) !void;
+    pub fn err(self: Style, writer: anytype, comptime fmt: []const u8, args: anytype) !void;
+    pub fn warn(self: Style, writer: anytype, comptime fmt: []const u8, args: anytype) !void;
+    pub fn info(self: Style, writer: anytype, comptime fmt: []const u8, args: anytype) !void;
+    pub fn dim(self: Style, writer: anytype, comptime fmt: []const u8, args: anytype) !void;
+    pub fn bold(self: Style, writer: anytype, comptime fmt: []const u8, args: anytype) !void;
+};
+```
+
+**Example:**
+```zig
+const style = ghostspec.colors.styled();
+try style.success(stdout, "All tests passed!\n", .{});
+try style.err(stderr, "Test failed: {s}\n", .{error_msg});
+```
+
+**Environment Variables:**
+- `NO_COLOR`: Disable colors
+- `FORCE_COLOR`: Force enable colors
+
+## 🔍 Filter API (New in v0.9.2)
+
+### `FilterConfig`
+
+Configure test filtering rules.
+
+```zig
+pub const FilterConfig = struct {
+    include_patterns: []const []const u8 = &.{},  // e.g., &.{"test_*", "*_integration"}
+    exclude_patterns: []const []const u8 = &.{},  // e.g., &.{"*_slow", "*_manual"}
+    exact_names: []const []const u8 = &.{},       // e.g., &.{"test_login", "test_auth"}
+    failed_only: bool = false,                     // Run only previously failed tests
+};
+```
+
+### `TestFilter`
+
+Filter tests based on patterns.
+
+```zig
+pub const TestFilter = struct {
+    pub fn init(allocator: std.mem.Allocator, config: FilterConfig) TestFilter;
+    pub fn deinit(self: *TestFilter) void;
+    pub fn shouldRun(self: *const TestFilter, test_name: []const u8) bool;
+    pub fn countMatches(self: *const TestFilter, test_names: []const []const u8) usize;
+    pub fn loadFailedTests(self: *TestFilter, file_path: []const u8) !void;
+};
+```
+
+### Pattern Matching
+
+Supports glob-style patterns:
+- `*` - matches any sequence of characters
+- `?` - matches a single character
+- Literal strings for exact matches
+
+**Examples:**
+```zig
+// Include only integration tests
+const config = FilterConfig{
+    .include_patterns = &.{"*_integration"},
+};
+
+// Exclude slow tests
+const config = FilterConfig{
+    .exclude_patterns = &.{"*_slow"},
+};
+
+// Run specific tests
+const config = FilterConfig{
+    .exact_names = &.{"test_auth", "test_login"},
+};
+
+// Combine filters
+const config = FilterConfig{
+    .include_patterns = &.{"test_*"},
+    .exclude_patterns = &.{"*_slow", "*_manual"},
+};
+```
+
+**Usage:**
+```zig
+const filter = ghostspec.filter.TestFilter.init(allocator, config);
+defer filter.deinit();
+
+for (all_tests) |test_name| {
+    if (filter.shouldRun(test_name)) {
+        // Run this test
+    }
+}
+```

@@ -4,6 +4,7 @@
 //! statistics, performance metrics, and various output formats.
 
 const std = @import("std");
+const colors = @import("colors.zig");
 
 /// Overall test report containing all results and statistics
 pub const TestReport = struct {
@@ -103,6 +104,69 @@ pub const TestReport = struct {
 
     /// Print summary to stdout
     pub fn printSummary(self: TestReport) void {
+        self.printSummaryColored(std.io.getStdErr().writer()) catch {
+            // Fallback to simple print if colored fails
+            self.printSummarySimple();
+        };
+    }
+
+    /// Print summary with colors
+    pub fn printSummaryColored(self: TestReport, writer: anytype) !void {
+        const style = colors.styled();
+        const status_emoji = if (self.allPassed()) "✅" else "❌";
+
+        try writer.writeAll("\n");
+        if (self.allPassed()) {
+            try style.success(writer, "{s} Test Summary\n", .{status_emoji});
+        } else {
+            try style.err(writer, "{s} Test Summary\n", .{status_emoji});
+        }
+        try style.dim(writer, "══════════════════════════════════════\n", .{});
+
+        try style.info(writer, "Total tests:     ", .{});
+        try writer.print("{any}\n", .{self.total});
+
+        try style.success(writer, "Passed:          ", .{});
+        try writer.print("{any} ", .{self.passed});
+        try style.dim(writer, "({d:.1}%)\n", .{self.successRate()});
+
+        if (self.failed > 0) {
+            try style.err(writer, "Failed:          ", .{});
+            try writer.print("{any} ❌\n", .{self.failed});
+        }
+
+        if (self.timeout > 0) {
+            try style.warn(writer, "Timeouts:        ", .{});
+            try writer.print("{any} ⏰\n", .{self.timeout});
+        }
+
+        if (self.errors > 0) {
+            try style.err(writer, "Errors:          ", .{});
+            try writer.print("{any} 💥\n", .{self.errors});
+        }
+
+        if (self.skipped > 0) {
+            try style.warn(writer, "Skipped:         ", .{});
+            try writer.print("{any} ⚠️\n", .{self.skipped});
+        }
+
+        try writer.writeAll("\n");
+        try style.bold(writer, "⏱️  Performance\n", .{});
+        try writer.print("Total duration:  {d:.2}s\n", .{@as(f64, @floatFromInt(self.total_duration_ms)) / 1000.0});
+        try writer.print("Average test:    {d:.2}ms\n", .{self.average_test_ms});
+
+        if (self.total > self.skipped) {
+            try style.success(writer, "Fastest test:    ", .{});
+            try writer.print("{any}ms\n", .{self.fastest_test_ms});
+            try style.warn(writer, "Slowest test:    ", .{});
+            try writer.print("{any}ms\n", .{self.slowest_test_ms});
+        }
+
+        try writer.writeAll("\n");
+    }
+
+    /// Print summary without colors (fallback)
+    fn printSummarySimple(self: TestReport) void {
         const status_emoji = if (self.allPassed()) "✅" else "❌";
 
         std.debug.print("\n{s} Test Summary\n", .{status_emoji});
@@ -141,7 +205,60 @@ pub const TestReport = struct {
     /// Print detailed results
     pub fn printDetailed(self: TestReport) void {
         self.printSummary();
+        self.printDetailedColored(std.io.getStdErr().writer()) catch {
+            self.printDetailedSimple();
+        };
+    }
 
+    /// Print detailed results with colors
+    fn printDetailedColored(self: TestReport, writer: anytype) !void {
+        const style = colors.styled();
+
+        if (self.totalFailures() > 0) {
+            try writer.writeAll("\n");
+            try style.err(writer, "🔍 Failed Tests\n", .{});
+            try style.dim(writer, "════════════════════════════════════\n", .{});
+
+            for (self.results.items) |result| {
+                if (result.status.isFailure()) {
+                    const status_icon = switch (result.status) {
+                        .failed => "❌",
+                        .timeout => "⏰",
+                        .err => "💥",
+                        else => "?",
+                    };
+
+                    try writer.print("{s} ", .{status_icon});
+                    try style.bold(writer, "{s}", .{result.name});
+                    try style.dim(writer, " ({d:.2}ms)\n", .{@as(f64, @floatFromInt(result.duration_ms))});
+
+                    if (result.error_message) |msg| {
+                        try style.err(writer, "   ┗━ Error: ", .{});
+                        try writer.print("{s}\n", .{msg});
+
+                        // Add helpful hints based on common errors
+                        if (std.mem.indexOf(u8, msg, "OutOfMemory") != null) {
+                            try style.dim(writer, "      💡 Hint: Consider checking for memory leaks or increasing available memory\n", .{});
+                        } else if (std.mem.indexOf(u8, msg, "FileNotFound") != null) {
+                            try style.dim(writer, "      💡 Hint: Verify the file path exists and is accessible\n", .{});
+                        } else if (std.mem.indexOf(u8, msg, "AccessDenied") != null) {
+                            try style.dim(writer, "      💡 Hint: Check file permissions\n", .{});
+                        }
+                    }
+
+                    if (result.stderr) |stderr| {
+                        try style.warn(writer, "   ┗━ Stderr: ", .{});
+                        try writer.print("{s}\n", .{stderr});
+                    }
+
+                    try writer.writeAll("\n");
+                }
+            }
+        }
+    }
+
+    /// Print detailed results without colors (fallback)
+    fn printDetailedSimple(self: TestReport) void {
         if (self.totalFailures() > 0) {
             std.debug.print("🔍 Failed Tests\n", .{});
             std.debug.print("════════════════════════════════════\n", .{});
